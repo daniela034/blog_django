@@ -3,6 +3,8 @@ from utils import rands
 from django.contrib.auth.models import User
 from utils.images import resize_image
 from django_summernote.models import AbstractAttachment
+from django.urls import reverse
+
 
 
 # Create your models here.
@@ -132,6 +134,12 @@ class Post(models.Model):
         blank=True, null=True,
         related_name='post_updated_by'
     )
+    
+    def get_absolute_url(self):
+        if not self.is_published: 
+            return reverse('blog:index')
+        return reverse('blog:post', args=(self.slug,))
+    
     
     
     def save(self, *args, **kwargs): 
