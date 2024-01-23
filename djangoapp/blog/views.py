@@ -198,22 +198,41 @@ class PageDetailView(DetailView):
 #       }
 # )
 
-
-def post(request, slug):
-    post = Post.objects.get_published().filter(slug=slug).first() # type: ignore
+class PostDetailView(DetailView):
+    allow_empty = False
+    model = Post
+    template_name = 'blog/pages/post.html'
+    slug_field = 'slug'
+    context_object_name = 'post'
     
-    if post is None: 
-        raise Http404()
-    
-    page_title = f'{post.title} - '
-    return render(
-        request,
-        'blog/pages/post.html',
-        {
-            'post': post,
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        post = self.get_object() 
+        page_title = post.title # type:ignore 
+        ctx.update({
             'page_title' : page_title,
-        }
-    )
+        })
+        return ctx
+    
+    def get_queryset(self):
+        return super().get_queryset().filter(is_published=True)
+    
+    
+#def post(request, slug):
+#    post = Post.objects.get_published().filter(slug=slug).first() # type: ignore
+    
+#    if post is None: 
+#        raise Http404()
+    
+#    page_title = f'{post.title} - '
+#    return render(
+#        request,
+#        'blog/pages/post.html',
+#        {
+#            'post': post,
+#            'page_title' : page_title,
+#        }
+#    )
     
 class TagListView(PostListView):
     allow_empty = False # error HTTP404
