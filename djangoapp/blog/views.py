@@ -1,9 +1,12 @@
+from typing import Any
+from django.db.models.query import QuerySet
+
 from django.shortcuts import render
 from django.core.paginator import Paginator 
 from blog.models import Post, Page
 from django.db.models import Q
 from django.contrib.auth.models import User
-from django.http import Http404
+from django.http import Http404, HttpRequest, HttpResponse
 from django.views.generic import ListView
 
 PER_PAGE = 9
@@ -47,32 +50,76 @@ class PostListView(ListView):
 #            'page_title' : 'Home - ',
 #        }
 #    )
-    
-def created_by(request,id):
-    user = User.objects.filter(pk=id).first()
-    
-    if user == None:
-       raise Http404() 
-    
-    posts = Post.objects.get_published().filter(created_by__pk=id) # type: ignore
-    paginator = Paginator(posts, PER_PAGE)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-    
-    user_full_name = user.username
-    if user.first_name: 
-        user_full_name = f'{user.first_name} {user.last_name}'
-        
-    page_title = user_full_name + ' posts -'
+ 
 
-    return render(
-        request,
-        'blog/pages/index.html',
-        {
-            'page_obj': page_obj,
+# we will reuse some of the things of the PostListView so the new class based view for 
+# the created by is going to be based on this class 
+class CreatedByListView(PostListView): 
+    # edit init for define a temporary context
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._temp_context: dict[str, Any] = {}
+        
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        user = self._temp_context['user']
+        user_full_name = user.username
+        if user.first_name: 
+            user_full_name = f'{user.first_name} {user.last_name}'
+        
+        page_title = user_full_name + ' posts -'
+        
+        ctx.update({
             'page_title' : page_title,
-        }
-    )
+        })
+        
+        return ctx
+    
+    def get_queryset(self) -> QuerySet[Any]:
+        qs = super().get_queryset()
+        qs = qs.filter(created_by__pk=self._temp_context['user'].pk)
+        return qs
+    
+    def get(self, request, *args, **kwargs):
+        
+        id = self.kwargs.get('id')
+        user = User.objects.filter(pk=id).first()
+    
+        if user == None:
+            raise Http404() 
+        
+        self._temp_context.update({
+            'id' : id, 
+            'user' : user,
+        })
+        
+        return super().get(request, *args, **kwargs)
+    
+#def created_by(request,id):
+#    user = User.objects.filter(pk=id).first()
+    
+#    if user == None:
+#       raise Http404() 
+    
+#    posts = Post.objects.get_published().filter(created_by__pk=id) # type: ignore
+#    paginator = Paginator(posts, PER_PAGE)
+#    page_number = request.GET.get("page")
+#    page_obj = paginator.get_page(page_number)
+    
+#    user_full_name = user.username
+#    if user.first_name: 
+#        user_full_name = f'{user.first_name} {user.last_name}'
+        
+#    page_title = user_full_name + ' posts -'
+
+#    return render(
+#        request,
+#        'blog/pages/index.html',
+#        {
+#            'page_obj': page_obj,
+#            'page_title' : page_title,
+#        }
+#    )
 
 def category(request,slug):
     posts = Post.objects.get_published().filter(category__slug=slug) # type: ignore
